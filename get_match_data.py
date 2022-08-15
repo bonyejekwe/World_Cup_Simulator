@@ -6,7 +6,7 @@ import pandas as pd
 def read_match_data():
     """Return match data read in from csv"""
     # https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017
-    matches = pd.read_csv("results.csv")
+    matches = pd.read_csv("data/match_results.csv")
     matches['date'] = pd.to_datetime(matches["date"])
     matches["year"] = [date.year for date in matches["date"]]  # [(i.year, i.month, i.day) for i in matches["date"]]
     return matches
@@ -57,7 +57,7 @@ def wc_rankings(start, end):
 
 def get_data(year):
     """Get the data up to {year}"""
-    rankings = wc_rankings("1998-01-01", wc_start[year])
+    rankings = pd.read_csv(ranking_year[year]) # = wc_rankings("1998-01-01", wc_start[year])
 
     data = duplicate_matches(read_match_data())
     data = data.merge(rankings, left_on=["team", "year"], right_on=["Team", "Year"]).rename(
@@ -77,4 +77,5 @@ def get_data(year):
 
 
 wc_start = {2022: "2022-11-21", 2018: "2018-06-14", 2014: "2014-06-12", 2010: "2010-06-11"}
-# print(get_data(2018)[1].shape)
+ranking_year = {2022: "data/rankings22.csv", 2018: "data/rankings18.csv", 2014: "data/rankings14.csv", 2010: "data/rankings10.csv"}
+# NOTE: 2022 ranking data is hardcoded for when last saved to csv (Aug 14)

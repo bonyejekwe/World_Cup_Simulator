@@ -46,6 +46,23 @@ class Simulation:
 
         tie_prob = 1 - team1_prob - team2_prob # probability of a tie
         return [team1_prob, tie_prob, team2_prob]
+
+    def get_poisson_score(self, result, team1_avg, team2_avg):
+        score1, score2 = np.random.poisson(team1_avg), np.random.poisson(team2_avg)
+
+        if (result == 1) and (score1 <= score2):
+            return self.get_poisson_score(result, team1_avg, team2_avg)
+        elif (result == -1) and (score1 >= score2):
+            return self.get_poisson_score(result, team1_avg, team2_avg)
+        elif (result == 0) and (score1 != score2):  # result == 0
+            return self.get_poisson_score(result, team1_avg, team2_avg)
+
+        return score1, score2
+
+    def get_poisson(self, result, rank1, rank2):
+        th = 10  # within 5 of the rank
+        d = self.data[(abs(self.data["team_rank"] - rank1) <= th) & (abs(self.data["opponent_rank"] - rank2) <= th) & (self.data["result"] == result)]
+        return self.get_poisson_score(result, d["team_score"].mean(), d["opponent_score"].mean())
         
     def simulate_group_match(self, team1, team2, pr=False):
         """Simulate a group stage match between two teams. Returns result (-1, 0, or 1)"""
@@ -64,36 +81,48 @@ class Simulation:
         draws = 0
         
         for team1, team2 in combinations(group, 2):  # each match
+            rank1, rank2 = self.team_ranks[team1], self.team_ranks[team2]
             result, team1_prob, tie_prob, team2_prob = self.simulate_group_match(team1, team2)
             
             if result == 1: # team1 wins
                 table_points[team1] += 3
-                win_goals, loss_goals = np.random.poisson(self.win_avg), np.random.poisson(self.loss_avg)
-                result_str = f"{win_goals}-{loss_goals} {team1} beats {team2}:"
-                gf[team1] += win_goals
-                gf[team2] += loss_goals
-                ga[team1] += loss_goals
-                ga[team2] += win_goals
+                team1_goals, team2_goals = self.get_poisson(result, rank1, rank2)
+                #win_goals, loss_goals = self.get_poisson(result, rank1, rank2) # np.random.poisson(self.win_avg), np.random.poisson(self.loss_avg)
+                result_str = f"{team1_goals}-{team2_goals} {team1} beats {team2}:"
+                gf[team1] += team1_goals
+                gf[team2] += team2_goals
+                ga[team1] += team1_goals
+                ga[team2] += team2_goals
 
             elif result == -1: # team2 wins
                 table_points[team2] += 3
-                win_goals, loss_goals = np.random.poisson(self.win_avg), np.random.poisson(self.loss_avg)
-                result_str = f"{loss_goals}-{win_goals} {team1} loses to {team2}"
-                gf[team1] += loss_goals
-                gf[team2] += win_goals
-                ga[team1] += win_goals
-                ga[team2] += loss_goals
+                team1_goals, team2_goals = self.get_poisson(result, rank1, rank2)
+                #win_goals, loss_goals = self.get_poisson(result, rank1, rank2) # np.random.poisson(self.win_avg), np.random.poisson(self.loss_avg)
+                result_str = f"{team1_goals}-{team2_goals} {team1} loses to {team2}"
+                gf[team1] += team1_goals
+                gf[team2] += team2_goals
+                ga[team1] += team1_goals
+                ga[team2] += team2_goals
+                ##gf[team1] += loss_goals
+                #gf[team2] += win_goals
+                #ga[team1] += win_goals
+                #ga[team2] += loss_goals
 
             else: # result == 0 (tie)
                 draws += 1
                 table_points[team1] += 1
                 table_points[team2] += 1
-                draw_goals = np.random.poisson(self.draw_avg)
-                result_str = f"{draw_goals}-{draw_goals} {team1} draws {team2}"
-                gf[team1] += draw_goals
-                gf[team2] += draw_goals
-                ga[team1] += draw_goals
-                ga[team2] += draw_goals
+                team1_goals, team2_goals = self.get_poisson(result, rank1, rank2)
+                #draw_goals = self.get_poisson(result, rank1, rank2)[0] # np.random.poisson(self.draw_avg)
+                result_str = f"{team1_goals}-{team2_goals} {team1} draws {team2}"
+                gf[team1] += team1_goals
+                gf[team2] += team2_goals
+                ga[team1] += team1_goals
+                ga[team2] += team2_goals
+                #gf[team1] += draw_goals
+                #gf[team2] += draw_goals
+                #ga[team1] += draw_goals
+                #ga[team2] += draw_goals
                 
             if pr:
                 print(result_str, [round(team1_prob, 2), round(tie_prob, 2), round(team2_prob, 2)],  "-> ", result)
