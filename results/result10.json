@@ -1,0 +1,10 @@
+{
+    "r16": ["Uruguay", "South Korea", "United States", "Ghana", "Netherlands", "Slovakia", "Brazil", "Chile", "Argentina", "Mexico", "Germany", "England", "Paraguay", "Japan", "Spain", "Portugal"],
+    "qf": ["Uruguay", "Ghana", "Netherlands", "Brazil", "Argentina", "Germany", "Paraguay", "Spain"],
+    "sf": ["Uruguay", "Netherlands", "Germany", "Spain"],
+    "final": ["Netherlands", "Spain"],
+    "bronze": ["Uruguay", "Germany"],
+    "third": ["Germany"],
+    "champ": ["Spain"],
+    "summary": ["Spain", "Netherlands", "Germany", "Uruguay"]
+}

@@ -1,0 +1,10 @@
+{
+    "r16": ["Uruguay", "Portugal", "France", "Argentina", "Brazil", "Mexico", "Belgium", "Japan", "Spain", "Russia", "Croatia", "Denmark", "Sweden", "Switzerland", "Colombia", "England"],
+    "qf": ["Uruguay", "France", "Brazil", "Belgium", "Russia", "Croatia", "Sweden", "England"],
+    "sf": ["France", "Belgium", "Croatia", "England"],
+    "final": ["France", "Croatia"],
+    "bronze": ["Belgium", "England"],
+    "third": ["Belgium"],
+    "champ": ["France"],
+    "summary": ["France", "Croatia", "Belgium", "England"]
+}
