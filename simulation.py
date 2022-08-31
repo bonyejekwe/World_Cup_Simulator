@@ -127,7 +127,6 @@ class Simulation:
         rank1, rank2 = self.team_ranks[team1], self.team_ranks[team2]
         d = self.data[(abs(self.data["team_rank"] - rank1) <= th) & (abs(self.data["opponent_rank"] - rank2) <= th)]# & (self.data["result"] == result)]
         return d["team_score"].mean(), d["opponent_score"].mean()
-        #return self.get_poisson_score(result, d["team_score"].mean(), d["opponent_score"].mean())
 
     def precompute_match_data(self):
         """Precompute the data for each possible matchup (since are constant for an entire simulation"""
@@ -153,7 +152,7 @@ class Simulation:
 
     #@Profiler.profile
     def simulate_group(self, group, pr=True):
-        """Simulate a group or a matchup"""
+        """Simulate a group stage"""
         table_points = {team: 0 for team in group}
         gf = {team: 0 for team in group}
         ga = {team: 0 for team in group}
@@ -197,7 +196,7 @@ class Simulation:
 
     #@Profiler.profile
     def get_knockout_round(self, pr=True):
-        """Get teams advancing to the knockout round"""
+        """Get the teams advancing to the knockout round"""
         gw = []  # group winners
         for group in self.groups_list:
             standings = [i[0] for i in self.simulate_group(group, pr=pr)]
@@ -205,6 +204,8 @@ class Simulation:
             
             if pr:
                 print("")
+
+        self.result["groups"] = gw
         return gw
 
     #@Profiler.profile
@@ -258,6 +259,10 @@ class Simulation:
         second = [t for t in final if t != champ][0]
         self.result["summary"] = [champ, second, third, fourth]
         return champ, second, third, fourth
+
+    def simulate_tournament(self, pr1=False, pr2=False):
+        gw = self.get_knockout_round(pr1)
+        return self.simulate_knockout_round(gw, pr2)
 
     def get_result(self, res):
         """Get a result"""

@@ -1,141 +1,98 @@
 
-from collections import Counter
-from get_match_data import *
-from group_stages import *
-from prediction_model import get_model
-from simulation import *
 import json
+from collections import Counter
+from get_match_data import wc_rankings, wc_start, get_data
+from group_stages import groups_list
+from prediction_model import get_model
+from simulation import Simulation
 
-# TODO take into account previous years of rankings in the logreg model
+def convert_to_groups(r16):
+    """Convert a r16 list to the group winners matrix"""
+    gw =[[r16[0], r16[9]], [r16[8], r16[1]],
+         [r16[2], r16[11]], [r16[10], r16[3]],
+         [r16[4], r16[13]], [r16[12], r16[5]],
+         [r16[6], r16[15]], [r16[14], r16[7]]]
+    return gw
 
-YEAR = 2018  # year for the model
-rankings, data = get_data(YEAR)
+def get_sim_results(year, iterations):
+    """Get the results of {iterations} simulations"""
+    rankings, data = get_data(year)
+    logreg, match_data = get_model(data, report=False)
+    s = Simulation(year, groups_list[year], logreg, match_data)
 
-logreg, match_data = get_model(data, report=False)
-sf_counter = Counter()
+    results_list = []
+    for i in range(iterations):
+        s.simulate_tournament(False, False)
+        results_list.append(s.result)
+        #if i % p == 0:
+        #    print(f"{(i / iters)*100}% done")
+    return results_list
 
-def evals(iters):
-    p = int(iters / 5)
-    results_dict = []
-    s = Simulation(YEAR, groups_list[YEAR], logreg, match_data)
-    for i in range(iters):
-        s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
-        results_dict.append(s.result)
-        if i % p == 0:
-            print(f"{(i / iters)*100}% done")
-    print("done")
-    return results_dict
+def common_winners(year, iterations, results=None):
+    """Results is optional, can be passed in"""
+    if not results:
+        results = get_sim_results(year, iterations)
 
+    winners = [ res['champ'][0] for res in results ]
+    c = Counter(winners).most_common(10)
 
-def compare_win(teams, results, iters):
-    """Compare the probability of winning the World Cupfor each team"""
-    for team in teams:
-        filtered = [r for r in results if team in r['r16']]
+    print(f"Most common winners of {year} World Cup...")
+    for team, num in c:
+        print(f"{team}: {round((num / iterations) * 100, 1)}%")
+
+def team_wins(team, year, iterations, results= None):
+    """Returns the % of times a team wins the tournament"""
+    return team_makes_round(team, "champ", year, iterations)
+
+def team_makes_round(team, round1, year, iterations, results=None):
+    """Returns the % of times a team makes {round}"""
+    if not results:
+        results = get_sim_results(year, iterations)
+    
+    return len([res for res in results if team in res[round1]]) / iterations
+
+def team_between_rounds(team, round1, round2, year, iterations, results=None):
+    """Returns the % of times a team makes {round2} given that they made {round1"""
     pass
 
-def compare_win_from_knockout(teams, results, iters):
-    """Compare the probability of winning the World Cupfor each team,
-    given that the team made the knockout stages"""
-    for team in teams:
-        filtered = [r for r in results if team in r['r16']]
-        wins = len([r for r in filtered if team == r['summary'][0]])
-        num, den = wins, len(filtered)
-    pass
+def common_round(round1, year, iterations, results=None):
+    """Results is optional, can be passed in"""
+    if not results:
+        results = get_sim_results(year, iterations)
+
+    winners = [ frozenset(res[round1]) for res in results ]
+    c = Counter(winners).most_common(10)
+
+    print(f"Most common {round1} occurences at {year} World Cup...")
+    for team, num in c:
+        print(f"{list(team)}: {round((num / iterations) * 100, 1)}%")
+
+#def compare_between_rounds()
+
+#common_winners(2018, 1000)
+import pandas as pd
+
+def get_prob_df(year, iterations, results=None):
+    if not results:
+        results = get_sim_results(year, iterations)
+
+    data = []
+    for group in groups_list[year]:
+        for team in group:
+            pw = round(100 * team_makes_round(team, "champ", year, iterations, results), 4)
+            pf = round(100 * team_makes_round(team, "final", year, iterations, results), 4)
+            ps = round(100 * team_makes_round(team, "sf", year, iterations, results), 4)
+            pq = round(100 * team_makes_round(team, "qf", year, iterations, results), 4)
+            pr = round(100 * team_makes_round(team, "r16", year, iterations, results), 4)
+            data.append([team, pr, pq, ps, pf, pw])
+    
+    return pd.DataFrame(data, columns=["team", "r16", "qf", "sf", "final", "champ"])
+
+#df = get_prob_df(2018, 10000)
+#print(df)
+
+common_round("champ", 2018, 1000)
+#common_round("r16", 2018, 1000)
 
 
-def knockout_round_vs_win(results, team):
-    filtered = [r for r in results if team in r['r16']]
-    filtered2 = [r for r in filtered if team == r['summary'][0]] #team in r['sf']] #team == r['summary'][0]]
-    num, den = len(filtered2), len(filtered)
-    if den > 0:
-        #print(f"{team}:, {num} / {den} = {round(num / den, 2)}")
-        return num / den
-    else:
-        #print(f"{team}:, {num} / {den} = {round(0, 2)}")
-        return 0
-
-def win(results, team):
-    #return len([r for r in results if team in r['sf']]) / iterats
-    return len([r for r in results if team == r['summary'][0]]) / iterats
-
-
-def comparison():
-    res = evals(iterats)
-    s = Simulation(YEAR, groups_list[YEAR], logreg, match_data)
-    tm_lis = [(tm, round(knockout_round_vs_win(res, tm), 3), round(win(res, tm), 3)) for tm in s.teams]
-    print('h')
-
-    tm_lis = sorted(tm_lis, key=lambda x: x[1], reverse=True)#[:10]
-    for tup in tm_lis:
-        print(tup)
-
-
-    tm_lis = [(tm, round(knockout_round_vs_win(res, tm) - win(res, tm), 3)) for tm in s.teams]
-
-    print('h')
-
-    tm_lis = sorted(tm_lis, key=lambda x: x[1], reverse=True)#[:10]
-    for tup in tm_lis:
-        print(tup)
-
-
-
-def real_result():
-
-    pass
-
-iterats = 1000
-
-
-s = Simulation(YEAR, groups_list[YEAR], logreg, match_data)
-s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
-predicted_result = s.result
-print("P: ", predicted_result)
-
-
-result_d = {2022: "results/result22.json", 2018: "results/result18.json", 2014: "results/result14.json", 2010: "results/result10.json"}
-
-with open(result_d[YEAR], "r") as f:
-    actual_results = json.load(f)
-
-print("A: ", actual_results)
-
-
-def intersection(lst1, lst2):
-    lst3 = [value for value in lst1 if value in lst2]
-    return lst3
-
-
-counts = {'r16': [], 'qf': [], 'sf': [], 'final': []}
-
-print("I")
-
-def conv(l):
-    g =[[l[0], l[9]],
-        [l[8], l[1]],
-        [l[2], l[11]],
-        [l[10], l[3]],
-        [l[4], l[13]],
-        [l[12], l[5]],
-        [l[6], l[15]],
-        [l[14], l[7]]]
-    return g
-
-
-#r16 = [gw[0][0], gw[1][1], gw[2][0], gw[3][1], gw[4][0], gw[5][1], gw[6][0], gw[7][1],
-#            gw[1][0], gw[0][1], gw[3][0], gw[2][1], gw[5][0], gw[4][1], gw[7][0], gw[6][1]]
-
-for _ in range(10000):
-    for st in ['r16', 'qf', 'sf', 'final']:
-        s.simulate_knockout_round(conv(actual_results['r16']), pr=False)
-        #s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
-        predicted_result = s.result
-        #print(st, len(intersection(actual_results[st], predicted_result[st])), intersection(actual_results[st], predicted_result[st]))
-        counts[st].append(len(intersection(actual_results[st], predicted_result[st])))
-        #if st == "r16" and len(intersection(actual_results[st], predicted_result[st])) != 16:
-        #    break
-
-
-for k, lis in counts.items():
-    print(k, round(sum(lis) / len(lis), 3))
-    print(Counter(lis))
+# TODO compute log likelihood for each simulation
