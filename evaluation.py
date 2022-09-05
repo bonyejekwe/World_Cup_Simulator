@@ -91,8 +91,32 @@ def get_prob_df(year, iterations, results=None):
 #df = get_prob_df(2018, 10000)
 #print(df)
 
-common_round("champ", 2018, 1000)
+#common_round("champ", 2018, 1000)
 #common_round("r16", 2018, 1000)
 
 
 # TODO compute log likelihood for each simulation
+
+def most_similar(year, iterations, cap, results=None):
+    if not results:
+        results = get_sim_results(year, iterations)
+
+    print(Counter([sum(res['error']) for res in results]))
+    print()
+    print(common_winners(year, iterations, results))
+    print()
+    
+    #print(Counter([r['champ'][0] for r in results[:cap]]))
+    results1 = results[:cap]
+    results2 = sorted(results, key=lambda x: abs(54 - sum(x['error'])))[:cap]
+
+    print(common_winners(year, cap, results1))
+    print()
+    print(common_winners(year, cap, results2))
+
+
+def main():
+    most_similar(2018, iterations=30000, cap=10000)
+
+if __name__ == "__main__":
+    main()

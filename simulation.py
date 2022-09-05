@@ -3,11 +3,12 @@ import numpy as np
 import pandas as pd
 from itertools import combinations
 #from profiler import Profiler
+from collections import Counter
 
 class Match:
 
     def __init__(self, team1, team2, dist, poisson_dist) -> None:
-        """Initialize"""
+        """Initialize a match object"""
         self.team1 = team1
         self.team2 = team2
         self.dist = dist
@@ -35,8 +36,21 @@ class Match:
         return score1, score2
 
     def probab_dist(self):
-        """Return the probability distribution for the match"""
-        return self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
+        """Return the probability distribution for the match [team1_prob, tie_prob, team2_prob]"""
+        return self.dist[(self.team1, self.team2)]
+
+    def get_error(self, result):
+        """Get the "difference" between the randomly simulated result and the maximum likelihood result"""
+        l = self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
+        if (result == 0) and (max(l) == l[1]):  # if tie most likely and predicted
+            return 0
+        elif (result == 0) or (max(l) == l[1]):  #
+            return 1
+        elif ((result == 1) and (max(l) == l[2])) or ((result == -1) and (max(l) == l[0])):
+            return 3
+        else:  # win most likely and predicted, or loss most likely and predicted
+            return 0
+
  
 class KnockoutMatch(Match):
 
@@ -67,6 +81,13 @@ class KnockoutMatch(Match):
         else:
             return self.team2
 
+    def get_error(self, result):
+        l = self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
+        if ((result == self.team1) and (l[0] > l[2])) or ((result == self.team2) and (l[2] > l[0])):
+            return 0
+        else: # add to error
+            return 3
+
 class Simulation:
 
     def __init__(self, year, groups_list, pred_model, match_data) -> None:
@@ -87,6 +108,7 @@ class Simulation:
         self.prob_dist = {}
         self.poissons = {}
         self.result = {}
+        self.error = []
         self.precompute_match_data()
 
     def get_teams(self):
@@ -162,6 +184,7 @@ class Simulation:
             m = Match(team1, team2, self.prob_dist, self.poissons)
             team1_prob, tie_prob, team2_prob = m.probab_dist()
             result = m.simulate_match()
+            self.error.append(m.get_error(result))
             team1_goals, team2_goals = m.get_match_score(result)
             
             gf[team1] += team1_goals
@@ -222,6 +245,7 @@ class Simulation:
         for i in range(num):
             m = KnockoutMatch(teams_lis[2*i], teams_lis[2*i+1], self.prob_dist, self.poissons)
             result = m.simulate_match()  # get the winning team
+            self.error.append(m.get_error(result))
             next_round.append(result)
         
         self.result[n_round] = next_round
@@ -258,9 +282,11 @@ class Simulation:
         champ = self.simulate_round(final, "champ", pr)[0]
         second = [t for t in final if t != champ][0]
         self.result["summary"] = [champ, second, third, fourth]
+        self.result["error"] = self.error
         return champ, second, third, fourth
 
     def simulate_tournament(self, pr1=False, pr2=False):
+        self.error = []
         gw = self.get_knockout_round(pr1)
         return self.simulate_knockout_round(gw, pr2)
 
@@ -273,15 +299,30 @@ from prediction_model import get_model
 from group_stages import *
 
 #@Profiler.profile
-def full():
+def main():
+    errors = []
     YEAR = 2018  # year for the model
     rankings, data = get_data(YEAR)
     logreg, match_data = get_model(data, report=True)
     s = Simulation(YEAR, groups_list[YEAR], logreg, match_data)
+    #s.simulate_tournament(True, True)
+    #return
     for _ in range(100):
-        r = s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
+        r = s.simulate_tournament(False, False)#s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
         print(r)
-        print(s.result['qf'])
+        #print(s.result['qf'])
+        print(s.error)
+        print(sum(s.error), len(s.error))
+        errors.append(sum(s.error))
 
-#full()
-#Profiler.report()
+    print("e", errors)
+    print("c", Counter(errors))
+
+    # error for 2018: 15 + 3 + 1 + 1 + 1 + 0 = 21(groups, r16, qf, f, bronze, final)
+    # error for 2018: 36 + 9 + 3 + 3 + 3 + 0 = 54(groups, r16, qf, f, bronze, final)
+
+    #6, 18, 24 ? (wrong, half, right)
+
+
+if __name__ == "__main__":
+    main()
