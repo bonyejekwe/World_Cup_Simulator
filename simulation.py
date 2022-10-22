@@ -4,6 +4,10 @@ import pandas as pd
 from itertools import combinations
 #from profiler import Profiler
 from collections import Counter
+from precompute import get_groups, get_teams, get_team_rank, get_team_score, all_pairings, compute_poission
+
+opp_result = {3: 0, 1: 1, 0: 3}
+str_result = {3: "beats", 1: "draws", 0: "loses to"}
 
 class Match:
 
@@ -17,7 +21,7 @@ class Match:
     def simulate_match(self, print_result=False):
         """Simulate a match using the precomputed probability distribution"""
         team1_prob, tie_prob, team2_prob = self.dist[(self.team1, self.team2)]
-        result = np.random.choice([1, 0, -1], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
+        result = np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
         return result
 
     def get_match_score(self, result):
@@ -26,11 +30,11 @@ class Match:
         score1, score2 = np.random.poisson(team1_avg), np.random.poisson(team2_avg)
 
         # if scores don't make sense with result, call function again
-        if (result == 1) and (score1 <= score2):
+        if (result == 3) and (score1 <= score2):
             return self.get_match_score(result)
-        elif (result == -1) and (score1 >= score2):
+        elif (result == 0) and (score1 >= score2):
             return self.get_match_score(result)
-        elif (result == 0) and (score1 != score2):
+        elif (result == 1) and (score1 != score2):
             return self.get_match_score(result)
 
         return score1, score2
@@ -40,6 +44,7 @@ class Match:
         return self.dist[(self.team1, self.team2)]
 
     def get_error(self, result):
+        return 0
         """Get the "difference" between the randomly simulated result and the maximum likelihood result"""
         l = self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
         if (result == 0) and (max(l) == l[1]):  # if tie most likely and predicted
@@ -59,9 +64,9 @@ class KnockoutMatch(Match):
 
     def simulate_match(self, print_result=False):
         team1_prob, tie_prob, team2_prob = self.dist[(self.team1, self.team2)]
-        result = np.random.choice([1, 0, -1], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
+        result = np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
         tie_str = ""
-        if result == 0:  # no ties for knockout round
+        if result == 1:  # no ties for knockout round
             total = team1_prob + team2_prob
             t1, t2 = team1_prob / total, team2_prob / total
             #result = Counter(np.random.choice([1, -1], trials, p =[t1, t2])) 
@@ -76,12 +81,13 @@ class KnockoutMatch(Match):
             else: # result == -1: # team2 wins
                 print(f"{self.team1} loses to {self.team2}{tie_str}: ".ljust(40), f"[{team1_prob} vs {team2_prob}]")
 
-        if result == 1:
+        if result == 3:
             return self.team1
         else:
             return self.team2
 
     def get_error(self, result):
+        return 0
         l = self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
         if ((result == self.team1) and (l[0] > l[2])) or ((result == self.team2) and (l[2] > l[0])):
             return 0
@@ -90,44 +96,25 @@ class KnockoutMatch(Match):
 
 class Simulation:
 
-    def __init__(self, year, groups_list, pred_model, match_data) -> None:
+    def __init__(self, year, pred_model, match_data) -> None:
         self.year = year
         self.model = pred_model
         self.data = match_data
-        self.groups_list = groups_list  # list for that year
-        self.teams = self.get_teams()
+        self.groups_list =  get_groups(year)  # list for that year
+        self.teams = get_teams(self.groups_list)
 
-        self.team_ranks = {}
-        self.team_scores = {}
-        self.get_ranks_and_scores()
-
-        self.win_avg = match_data[match_data["result"] == 1]['team_score'].mean()
-        self.loss_avg = match_data[match_data["result"] == -1]['team_score'].mean()
-        self.draw_avg = match_data[match_data["result"] == 0]['team_score'].mean()
+        self.team_ranks = {t: get_team_rank(t, self.data) for t in self.teams}
+        self.team_scores = {t: get_team_score(t, self.data) for t in self.teams}
 
         self.prob_dist = {}
         self.poissons = {}
-        self.result = {}
-        self.error = []
         self.precompute_match_data()
 
-    def get_teams(self):
-        """Return the teams as a single list"""
-        teams = []
-        for group in self.groups_list:
-            for team in group:
-                teams.append(team)
-        return teams
+        self.result = {}
+        self.error = []
 
-    def get_ranks_and_scores(self):
-        """Get the ranks and scores for each team and store in respective dictionaries"""
-        for group in self.groups_list:
-            for team in group:
-                self.team_ranks[team] = self.data[self.data["team"] == team].iloc[-1]["team_rank"]
-                self.team_scores[team] = self.data[self.data["team"] == team].iloc[-1]["team_points"]
-     
     def compute_probabs(self, team1, team2):
-        """Get the probabilities"""
+        """Get the probabilities for a match pairing"""
         rank1, rank2 = self.team_ranks[team1], self.team_ranks[team2]
         points1, points2 = self.team_scores[team1], self.team_scores[team2]
         
@@ -143,25 +130,15 @@ class Simulation:
 
         return [team1_prob, 1 - team1_prob - team2_prob, team2_prob]  # team1_prob, tie_prob, team2_prob
 
-    def compute_poisson(self, team1, team2):
-        """Return the average team1 goals and the average team2 goals"""
-        th = 10  # within 5 of the rank
-        rank1, rank2 = self.team_ranks[team1], self.team_ranks[team2]
-        d = self.data[(abs(self.data["team_rank"] - rank1) <= th) & (abs(self.data["opponent_rank"] - rank2) <= th)]# & (self.data["result"] == result)]
-        return d["team_score"].mean(), d["opponent_score"].mean()
-
     def precompute_match_data(self):
         """Precompute the data for each possible matchup (since are constant for an entire simulation"""
-        for t1 in self.teams:
-            for t2 in self.teams:
-                if t1 != t2:
-                    #p = self.compute_probabs(t1, t2)
-                    self.prob_dist[(t1, t2)] = self.compute_probabs(t1, t2)
-                    self.prob_dist[(t2, t1)] = self.compute_probabs(t2, t1)
+        for t1, t2 in all_pairings(self.teams):
+            self.prob_dist[(t1, t2)] = self.compute_probabs(t1, t2)
+            self.prob_dist[(t2, t1)] = self.compute_probabs(t2, t1)
 
-                    s1, s2 = self.compute_poisson(t1, t2)
-                    self.poissons[(t1, t2)] = (s1, s2)
-                    self.poissons[(t2, t1)] = (s2, s1)
+            s1, s2 = compute_poission(self.team_ranks[t1], self.team_ranks[t2], self.data)
+            self.poissons[(t1, t2)] = (s1, s2)
+            self.poissons[(t2, t1)] = (s2, s1)
         return
 
     def get_probabs(self, team1, team2):
@@ -189,23 +166,16 @@ class Simulation:
             
             gf[team1] += team1_goals
             gf[team2] += team2_goals
-            ga[team1] += team1_goals
-            ga[team2] += team2_goals
+            ga[team1] += team2_goals
+            ga[team2] += team1_goals
 
-            if result == 1: # team1 wins
-                table_points[team1] += 3
-                result_str = f"{team1_goals}-{team2_goals} {team1} beats {team2}:"
+            table_points[team1] += result
+            table_points[team2] += opp_result[result]
+            result_str = f"{team1_goals}-{team2_goals}: {team1} {str_result[result]} {team2}:"
 
-            elif result == -1: # team2 wins
-                table_points[team2] += 3
-                result_str = f"{team1_goals}-{team2_goals} {team1} loses to {team2}"
-
-            else: # result == 0 (tie)
+            if result == 1: # tie
                 draws += 1
-                table_points[team1] += 1
-                table_points[team2] += 1
-                result_str = f"{team1_goals}-{team2_goals} {team1} draws {team2}"
-                
+
             if pr:
                 print(result_str, [round(team1_prob, 2), round(tie_prob, 2), round(team2_prob, 2)],  "-> ", result)
 
@@ -215,13 +185,17 @@ class Simulation:
         
         if pr:
             print(standings, "draws:", draws)
+
+        knockout_teams = [i[0] for i in standings][:2]
         return standings
 
     #@Profiler.profile
     def get_knockout_round(self, pr=True):
         """Get the teams advancing to the knockout round"""
+        #gw = [self.simulate_group(g) for g in self.groups_list.values()]
+
         gw = []  # group winners
-        for group in self.groups_list:
+        for group in self.groups_list.values():
             standings = [i[0] for i in self.simulate_group(group, pr=pr)]
             gw.append(standings[:2])
             
@@ -296,7 +270,6 @@ class Simulation:
 
 from get_match_data import *
 from prediction_model import get_model
-from group_stages import *
 
 #@Profiler.profile
 def main():
@@ -304,15 +277,15 @@ def main():
     YEAR = 2018  # year for the model
     rankings, data = get_data(YEAR)
     logreg, match_data = get_model(data, report=True)
-    s = Simulation(YEAR, groups_list[YEAR], logreg, match_data)
-    #s.simulate_tournament(True, True)
-    #return
+
+    print(get_groups(2018))
+    s = Simulation(YEAR, logreg, match_data)
     for _ in range(100):
         r = s.simulate_tournament(False, False)#s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
         print(r)
-        #print(s.result['qf'])
-        print(s.error)
-        print(sum(s.error), len(s.error))
+        ##print(s.result['qf'])
+        #print(s.error)
+        #print(sum(s.error), len(s.error))
         errors.append(sum(s.error))
 
     print("e", errors)

@@ -1,0 +1,45 @@
+{
+    "2010" : {
+        "a" : ["Uruguay", "Mexico", "South Africa", "France"],
+        "b" : ["Argentina", "South Korea", "Greece", "Nigeria"],
+        "c" : ["United States", "England", "Slovenia", "Algeria"],
+        "d" : ["Germany", "Ghana", "Australia", "Serbia"],
+        "e" : ["Netherlands", "Japan", "Denmark", "Cameroon"],
+        "f" : ["Paraguay", "Slovakia", "New Zealand", "Italy"],
+        "g" : ["Brazil", "Portugal", "Ivory Coast", "North Korea"],
+        "h" : ["Spain", "Chile", "Switzerland", "Honduras"]
+    },
+
+    "2014" : {
+        "a" : ["Brazil", "Mexico", "Croatia", "Cameroon"],
+        "b" : ["Netherlands", "Chile", "Spain", "Australia"],
+        "c" : ["Colombia", "Greece", "Ivory Coast", "Japan"],
+        "d" : ["Costa Rica", "Uruguay", "Italy", "England"],
+        "e" : ["France", "Switzerland", "Ecuador", "Honduras"],
+        "f" : ["Argentina", "Nigeria", "Bosnia and Herzegovina", "Iran"],
+        "g" : ["Germany", "United States", "Portugal", "Ghana"],
+        "h" : ["Belgium", "Algeria", "Russia", "South Korea"]
+    },
+
+    "2018" : {
+        "a" : ["Uruguay", "Russia", "Saudi Arabia", "Egypt"],
+        "b" : ["Spain", "Portugal", "Iran", "Morocco"],
+        "c" : ["France", "Denmark", "Peru", "Australia"],
+        "d" : ["Croatia", "Argentina", "Nigeria", "Iceland"],
+        "e" : ["Brazil", "Switzerland", "Serbia", "Costa Rica"],
+        "f" : ["Sweden", "Mexico", "South Korea", "Germany"],
+        "g" : ["Belgium", "England", "Tunisia", "Panama"],
+        "h" : ["Colombia", "Japan", "Senegal", "Poland"]
+    },
+
+    "2022" : {
+        "a" : ["Qatar", "Ecuador", "Senegal", "Netherlands"],
+        "b" : ["England", "Iran", "United States", "Wales"],
+        "c" : ["Argentina", "Saudi Arabia", "Mexico", "Poland"],
+        "d" : ["France", "Australia", "Denmark", "Tunisia"],
+        "e" : ["Spain", "Costa Rica", "Germany", "Japan"],
+        "f" : ["Belgium", "Canada", "Morocco", "Croatia"],
+        "g" : ["Brazil", "Serbia", "Switzerland", "Cameroon"],
+        "h" : ["Portugal", "Ghana", "Uruguay", "South Korea"]
+    }
+}

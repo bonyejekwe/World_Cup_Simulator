@@ -1,8 +1,7 @@
 
-import json
 from collections import Counter
 from get_match_data import wc_rankings, wc_start, get_data
-from group_stages import groups_list
+from precompute import get_groups
 from prediction_model import get_model
 from simulation import Simulation
 
@@ -18,7 +17,7 @@ def get_sim_results(year, iterations):
     """Get the results of {iterations} simulations"""
     rankings, data = get_data(year)
     logreg, match_data = get_model(data, report=False)
-    s = Simulation(year, groups_list[year], logreg, match_data)
+    s = Simulation(year, logreg, match_data)
 
     results_list = []
     for i in range(iterations):
@@ -77,7 +76,7 @@ def get_prob_df(year, iterations, results=None):
         results = get_sim_results(year, iterations)
 
     data = []
-    for group in groups_list[year]:
+    for group in get_groups(year).values():
         for team in group:
             pw = round(100 * team_makes_round(team, "champ", year, iterations, results), 4)
             pf = round(100 * team_makes_round(team, "final", year, iterations, results), 4)
