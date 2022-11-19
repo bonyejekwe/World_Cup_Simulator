@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from itertools import combinations
-#from profiler import Profiler
+from profiler import Profiler
 from collections import Counter
 from precompute import get_groups, get_teams, get_team_rank, get_team_score, all_pairings, compute_poission
 
@@ -18,11 +18,10 @@ class Match:
         self.dist = dist
         self.poisson_dist = poisson_dist
 
-    def simulate_match(self, print_result=False):
+    def simulate_match(self):
         """Simulate a match using the precomputed probability distribution"""
         team1_prob, tie_prob, team2_prob = self.dist[(self.team1, self.team2)]
-        result = np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
-        return result
+        return np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob]) # result
 
     def get_match_score(self, result):
         """Return a possible score for the match given a result"""
@@ -62,29 +61,30 @@ class KnockoutMatch(Match):
     def __init__(self, team1, team2, dist, poisson_dist) -> None:
         super().__init__(team1, team2, dist, poisson_dist)
 
-    def simulate_match(self, print_result=False):
+    def simulate_match(self):
+        """Return the result (3 or 0) for the knockout match (no ties)"""
+        #result = super().simulate_match()
         team1_prob, tie_prob, team2_prob = self.dist[(self.team1, self.team2)]
-        result = np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob]) # either -1, 0, or 1 (1 trial)
-        tie_str = ""
+        result = np.random.choice([3, 1, 0], p = [team1_prob, tie_prob, team2_prob])
+        #tie_str = ""
         if result == 1:  # no ties for knockout round
-            total = team1_prob + team2_prob
-            t1, t2 = team1_prob / total, team2_prob / total
-            #result = Counter(np.random.choice([1, -1], trials, p =[t1, t2])) 
-            result = np.random.choice([1, -1], p=[t1, t2])
-            #result = result.most_common()[0][0] # either 1 or -1
-            tie_str = " in OT"
-            
-        if print_result:
-            if result == 1: # team1 wins
-                print(f"{self.team1} beats {self.team2}{tie_str}: ".ljust(40), f"[{team1_prob} vs {team2_prob}]")
-                
-            else: # result == -1: # team2 wins
-                print(f"{self.team1} loses to {self.team2}{tie_str}: ".ljust(40), f"[{team1_prob} vs {team2_prob}]")
+            t1, t2 = team1_prob / (team1_prob + team2_prob), team2_prob / (team1_prob + team2_prob)
+            result = np.random.choice([3, 0], p=[t1, t2])
+            #tie_str = " in OT" 
+        return result
+
+    def match_winner(self, pr=False):
+        """Return the name of the winning team"""
+        result = self.simulate_match()
+
+        if pr:
+            print(f"{self.team1} {str_result[result]} {self.team2}")
 
         if result == 3:
             return self.team1
-        else:
+        else:  # result == 0
             return self.team2
+
 
     def get_error(self, result):
         return 0
@@ -117,16 +117,13 @@ class Simulation:
         """Get the probabilities for a match pairing"""
         rank1, rank2 = self.team_ranks[team1], self.team_ranks[team2]
         points1, points2 = self.team_scores[team1], self.team_scores[team2]
+        cols = ['team_rank', "opponent_rank", 'team_points', 'opponent_points']
         
-        rank_diff = rank1 - rank2
-        avg_rank = (rank1 + rank2) / 2
-
-        cols = ['rank_diff', 'avg_rank', 'neutral', 'team_points', 'opponent_points']
-        row = pd.DataFrame(np.array([[rank_diff, avg_rank, True, points1, points2]]), columns=cols)
-        team1_prob = round(self.model.predict_proba(row)[:,1][0], 2)   # probablity team1 wins
-
-        row = pd.DataFrame(np.array([[-1 * rank_diff, avg_rank, True, points2, points1]]), columns=cols)
-        team2_prob = round(self.model.predict_proba(row)[:,1][0], 2)   # probablity team2 wins
+        row1 = pd.DataFrame(np.array([[rank1, rank2, points1, points2]]), columns=cols)
+        team1_prob = round(self.model.predict_proba(row1)[:,1][0], 2)   # probablity team1 wins
+        
+        row2 = pd.DataFrame(np.array([[rank2, rank1, points2, points1]]), columns=cols)
+        team2_prob = round(self.model.predict_proba(row2)[:,1][0], 2)   # probablity team2 wins
 
         return [team1_prob, 1 - team1_prob - team2_prob, team2_prob]  # team1_prob, tie_prob, team2_prob
 
@@ -149,8 +146,8 @@ class Simulation:
         """Get the poisson avg for each team"""
         return self.poissons[(team1, team2)]
 
-    #@Profiler.profile
-    def simulate_group(self, group, pr=True):
+    @Profiler.profile
+    def simulate_group(self, group, pr=False):
         """Simulate a group stage"""
         table_points = {team: 0 for team in group}
         gf = {team: 0 for team in group}
@@ -159,7 +156,6 @@ class Simulation:
         
         for team1, team2 in combinations(group, 2):  # each match
             m = Match(team1, team2, self.prob_dist, self.poissons)
-            team1_prob, tie_prob, team2_prob = m.probab_dist()
             result = m.simulate_match()
             self.error.append(m.get_error(result))
             team1_goals, team2_goals = m.get_match_score(result)
@@ -171,36 +167,37 @@ class Simulation:
 
             table_points[team1] += result
             table_points[team2] += opp_result[result]
-            result_str = f"{team1_goals}-{team2_goals}: {team1} {str_result[result]} {team2}:"
 
             if result == 1: # tie
                 draws += 1
 
             if pr:
+                team1_prob, tie_prob, team2_prob = m.probab_dist()
+                result_str = f"{team1_goals}-{team2_goals}: {team1} {str_result[result]} {team2}:"
                 print(result_str, [round(team1_prob, 2), round(tie_prob, 2), round(team2_prob, 2)],  "-> ", result)
 
         gdiff = {team: gf[team] - ga[team] for team in group}
-        standings = sorted(group, key=lambda x: (table_points[x], gdiff[x], gf[x]), reverse=True)
-        standings = [(t, table_points[t], gdiff[t], gf[t]) for t in standings]
+        standings = sorted(group, key=lambda x: (table_points[x], gdiff[x], gf[x]), reverse=True)[:2]
         
         if pr:
-            print(standings, "draws:", draws)
+            full_standings = [(t, table_points[t], gdiff[t], gf[t]) for t in standings]
+            print(full_standings, "draws:", draws)
 
-        knockout_teams = [i[0] for i in standings][:2]
         return standings
 
-    #@Profiler.profile
+    @Profiler.profile
     def get_knockout_round(self, pr=True):
         """Get the teams advancing to the knockout round"""
-        #gw = [self.simulate_group(g) for g in self.groups_list.values()]
+        gw = [self.simulate_group(g) for g in self.groups_list.values()]
 
-        gw = []  # group winners
-        for group in self.groups_list.values():
-            standings = [i[0] for i in self.simulate_group(group, pr=pr)]
-            gw.append(standings[:2])
-            
-            if pr:
-                print("")
+
+        #gw = []  # group winners
+        #for group in self.groups_list.values():
+        #    standings = [i[0] for i in self.simulate_group(group, pr=pr)]
+        #    gw.append(standings[:2])
+
+        if pr:
+            print("")
 
         self.result["groups"] = gw
         return gw
@@ -208,7 +205,7 @@ class Simulation:
     #@Profiler.profile
     def get_knockout_round_group(self, group, pr=True):
         """Get teams advancing to the knockout round"""
-        return [i[0] for i in self.simulate_group(group, pr=pr)][:2]
+        return [i for i in self.simulate_group(group, pr=pr)][:2]
 
     #@Profiler.profile
     def simulate_round(self, teams_lis, n_round="S", print_result=True):
@@ -218,7 +215,7 @@ class Simulation:
         num = int(n / 2)
         for i in range(num):
             m = KnockoutMatch(teams_lis[2*i], teams_lis[2*i+1], self.prob_dist, self.poissons)
-            result = m.simulate_match()  # get the winning team
+            result = m.match_winner()  # get the winning team
             self.error.append(m.get_error(result))
             next_round.append(result)
         
@@ -228,7 +225,7 @@ class Simulation:
             print(f"{n_round}: {next_round}")
         return next_round
 
-    #@Profiler.profile
+    @Profiler.profile
     def simulate_knockout_round(self, gw, pr=False):
         """Simulate the knockout stages, determine top 4 teams"""
         self.result = {}
@@ -240,16 +237,16 @@ class Simulation:
             print("Group Winners:", gw)
             print("\nR16: ", r16)
 
-        qf = self.simulate_round(r16, "qf", pr)
-        sf = self.simulate_round(qf, "sf", pr)
+        qf = self.simulate_round(r16, "QF", pr)
+        sf = self.simulate_round(qf, "SF", pr)
         final = self.simulate_round(sf, "final", False)
 
         bronze = [t for t in sf if t not in final]
         self.result["bronze"] = bronze
         
         if pr:
-            print("B  :", bronze)
-            print("F  :", final)
+            print("B :", bronze)
+            print("F :", final)
         
         third = self.simulate_round(bronze, "third", pr)[0]
         fourth = [t for t in bronze if t != third][0]
@@ -268,28 +265,40 @@ class Simulation:
         """Get a result"""
         return self.result[res]
 
+    def get_simulation_results(self, iterations):
+        """Run {iterations} simulations and return a list of the results"""
+        results_list = []
+        for i in range(iterations):
+            self.simulate_tournament(False, False)
+            results_list.append(self.result)
+            #if i % p == 0:
+            #    print(f"{(i / iters)*100}% done")
+        return results_list
+
+
 from get_match_data import *
 from prediction_model import get_model
 
-#@Profiler.profile
+@Profiler.profile
 def main():
     errors = []
-    YEAR = 2018  # year for the model
+    YEAR = 2022  # year for the model
     rankings, data = get_data(YEAR)
     logreg, match_data = get_model(data, report=True)
 
-    print(get_groups(2018))
     s = Simulation(YEAR, logreg, match_data)
-    for _ in range(100):
-        r = s.simulate_tournament(False, False)#s.simulate_knockout_round(s.get_knockout_round(False), pr=False)
-        print(r)
+    for _ in range(1000):
+        r = s.simulate_tournament(False, False)
+        #print(r)
         ##print(s.result['qf'])
         #print(s.error)
         #print(sum(s.error), len(s.error))
         errors.append(sum(s.error))
 
-    print("e", errors)
-    print("c", Counter(errors))
+    #print("e", errors)
+    #print("c", Counter(errors))
+
+    #s.simulate_tournament(True, True)
 
     # error for 2018: 15 + 3 + 1 + 1 + 1 + 0 = 21(groups, r16, qf, f, bronze, final)
     # error for 2018: 36 + 9 + 3 + 3 + 3 + 0 = 54(groups, r16, qf, f, bronze, final)
@@ -299,3 +308,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print(Profiler.report())

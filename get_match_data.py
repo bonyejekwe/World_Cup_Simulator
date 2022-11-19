@@ -5,7 +5,7 @@ import pandas as pd
 
 def read_match_data():
     """Return match data read in from csv"""
-    # https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017
+    # https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017 (downloaded 11/19/22)
     matches = pd.read_csv("data/match_results.csv")
     matches['date'] = pd.to_datetime(matches["date"])
     matches["year"] = [date.year for date in matches["date"]]  # [(i.year, i.month, i.day) for i in matches["date"]]
@@ -78,4 +78,4 @@ def get_data(year):
 
 wc_start = {2022: "2022-11-21", 2018: "2018-06-14", 2014: "2014-06-12", 2010: "2010-06-11"}
 ranking_year = {2022: "data/rankings22.csv", 2018: "data/rankings18.csv", 2014: "data/rankings14.csv", 2010: "data/rankings10.csv"}
-# NOTE: 2022 ranking data is hardcoded for when last saved to csv (Aug 14)
+# NOTE: 2022 ranking data is hardcoded for when last saved to csv (Nov 11)

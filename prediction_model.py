@@ -7,8 +7,7 @@ from sklearn.metrics import classification_report
 
 def get_model(match_data, report=False):
     """Get the model trained on data before {year}"""
-    X, y = match_data[["rank_diff", "avg_rank", "neutral", "team_points", "opponent_points"]], match_data["team_won"]
-    # X,y=match_data[["team_rank", "opponent_rank", "neutral", "team_points", "opponent_points"]],match_data["team_won"]
+    X, y = match_data[["team_rank", "opponent_rank", "team_points", "opponent_points"]], match_data["team_won"]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=6, stratify=y)
 
     logreg = LogisticRegression()  # LogisticRegressionCV(cv=5, random_state=0).fit(X, y)
@@ -22,13 +21,8 @@ def get_model(match_data, report=False):
         print(f"Test data model accuracy: {logreg.score(X_test, y_test)}")
         print("\n", classification_report(y_test, y_pred))
 
-        t2 = X_test['rank_diff'] < 0  # t2 = -1 * np.sign(X_test['rank_diff'])
-        # t2 = X_test['team_rank'] < X_test['opponent_rank']  # t2 = -1 * np.sign(X_test['rank_diff'])
-
-        print("Baseline {predict higher ranked team}:\n", classification_report(y_test, t2))
+        #t2 = X_test['team_rank'] < X_test['opponent_rank']  # t2 = -1 * np.sign(X_test['rank_diff'])
+        #print("Baseline {predict higher ranked team}:\n", classification_report(y_test, t2))
 
     match_data = match_data.sort_values(by="date")
     return logreg, match_data
-
-# logreg, rankings, match_data = get_model(data, report=True)
-# print(match_data.groupby("result")["result"].count())
