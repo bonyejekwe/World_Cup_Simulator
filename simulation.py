@@ -43,9 +43,12 @@ class Match:
         return self.dist[(self.team1, self.team2)]
 
     def get_error(self, result):
-        return 0
         """Get the "difference" between the randomly simulated result and the maximum likelihood result"""
+        return 0
         l = self.dist[(self.team1, self.team2)]  # team1_prob, tie_prob, team2_prob
+        if ((result == 1) and (max(l) == l[1])) or (result == 3) and (max(l) == l[0]) or (result == 0) and (max(l) == l[2]):
+            return 0
+        return 0
         if (result == 0) and (max(l) == l[1]):  # if tie most likely and predicted
             return 0
         elif (result == 0) or (max(l) == l[1]):  #
@@ -188,13 +191,7 @@ class Simulation:
     @Profiler.profile
     def get_knockout_round(self, pr=True):
         """Get the teams advancing to the knockout round"""
-        gw = [self.simulate_group(g) for g in self.groups_list.values()]
-
-
-        #gw = []  # group winners
-        #for group in self.groups_list.values():
-        #    standings = [i[0] for i in self.simulate_group(group, pr=pr)]
-        #    gw.append(standings[:2])
+        gw = [self.simulate_group(g, pr) for g in self.groups_list.values()]
 
         if pr:
             print("")
@@ -289,21 +286,7 @@ def main():
     s = Simulation(YEAR, logreg, match_data)
     for _ in range(1000):
         r = s.simulate_tournament(False, False)
-        #print(r)
-        ##print(s.result['qf'])
-        #print(s.error)
-        #print(sum(s.error), len(s.error))
         errors.append(sum(s.error))
-
-    #print("e", errors)
-    #print("c", Counter(errors))
-
-    #s.simulate_tournament(True, True)
-
-    # error for 2018: 15 + 3 + 1 + 1 + 1 + 0 = 21(groups, r16, qf, f, bronze, final)
-    # error for 2018: 36 + 9 + 3 + 3 + 3 + 0 = 54(groups, r16, qf, f, bronze, final)
-
-    #6, 18, 24 ? (wrong, half, right)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,5 @@
 __pycache__
 .idea/
 .ipynb_checkpoints/
-Misc_Code.ipynb
-match_scores.ipynb
 profiler.py
 .DS_Store
-evaluation2.py
